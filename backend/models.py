@@ -26,6 +26,11 @@ class Assignment(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
     test_cases = Column(Text, nullable=True)  # JSON string
+    starter_code = Column(Text, nullable=True)
+    hints = Column(Text, nullable=True)  # JSON string
+    topic = Column(String(100), nullable=True)
+    difficulty = Column(String(20), nullable=True)  # beginner, intermediate, advanced
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     submissions = relationship("Submission", back_populates="assignment")
@@ -38,8 +43,13 @@ class Submission(Base):
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     assignment_id = Column(Integer, ForeignKey("assignments.id"), nullable=False)
     code = Column(Text, nullable=False)
-    status = Column(String(20), default="pending")  # pending, passed, failed
+    status = Column(String(20), default="pending")  # pending, passed, failed, partial
     timestamp = Column(DateTime, default=datetime.utcnow)
+    test_results = Column(Text, nullable=True)  # JSON string with test results
+    passed_tests = Column(Integer, default=0)
+    failed_tests = Column(Integer, default=0)
+    total_tests = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
     
     # Relationships
     student = relationship("Student", back_populates="submissions")
