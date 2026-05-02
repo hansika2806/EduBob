@@ -20,7 +20,7 @@
   - JWT tokens for session management
   - FastAPI dependency injection for role checking
 - **Library**: `python-jose` for JWT, `passlib` for password hashing
-- **CORS**: Configure FastAPI CORS middleware for `http://localhost:3000` (React dev server)
+- **CORS**: Configure FastAPI CORS middleware for `http://localhost:5173` (Vite dev server)
 
 ### Code Execution Security
 - **Sandboxing Strategy**: `RestrictedPython` library for MVP
@@ -38,12 +38,13 @@
   ```
 
 ### Mistake Pattern Detection
-- **Algorithm**: Rule-based + keyword extraction (MVP)
-  - Parse Python AST for common anti-patterns
-  - Extract error messages from failed test runs
-  - Group by similarity using simple string matching
-  - Store as JSON: `{"pattern_type": "...", "description": "...", "examples": [...]}`
-- **Future Enhancement**: Use Bob Ask mode to analyze patterns with AI
+- **Algorithm**: watsonx.ai integration with granite-3-8b-instruct model
+  - Aggregate student errors from failed submissions
+  - Send to watsonx.ai for pattern analysis
+  - Extract common mistake categories and recommendations
+  - Store as JSON: `{"pattern_type": "...", "description": "...", "examples": [...], "recommendation": "..."}`
+- **Implementation**: Create `watsonx_client.py` for API integration
+- **Fallback**: Rule-based AST parsing if watsonx.ai unavailable
 
 ### Database & Migrations
 - **Migration Tool**: Alembic
@@ -78,15 +79,21 @@
 
 ### Bob Session Management
 - **Export Trigger**: After each phase completion
-- **Storage**: `bob_sessions/phase_{N}_{timestamp}.json`
-- **Automation**: FastAPI endpoint to trigger export
-- **Format**: Bob's native session export format
+- **Storage**: `bob_sessions/phase_{N}_{timestamp}.md` + screenshot
+- **Automation**: Manual export via Bob UI
+- **Format**: Markdown conversation + PNG screenshot
+- **Documentation**: Create `bob_sessions/README.md` explaining session structure
 
 ### Deliverables
 - Architecture document (this section)
 - Decision log for key choices
 - Bob integration proof-of-concept script
 - Security checklist for code execution
+- `bob_sessions/README.md` created
+
+### Phase Completion
+- **Export Bob session**: Save conversation as `.md` file and take screenshot
+- **Location**: `bob_sessions/phase0_architecture.md` + `phase0_architecture.png`
 
 ---
 
@@ -106,12 +113,12 @@
 - Implement environment variable configuration (.env)
 - Add .env to .gitignore
 - Set up authentication (JWT tokens, password hashing)
-- Configure CORS for React frontend
+- Configure CORS for React frontend (`http://localhost:5173`)
 - Implement logging infrastructure
 - Create custom exception handlers
 
 ### Frontend
-- Initialize React app with functional components
+- Initialize React app with Vite and functional components
 - Set up routing structure (React Router)
 - Create basic layout components (Header, Sidebar, MainContent)
 - Configure API client (Axios) with interceptors
@@ -131,6 +138,10 @@
 - Environment configuration in place
 - Logging and error handling operational
 - Basic test infrastructure ready
+
+### Phase Completion
+- **Export Bob session**: Save conversation as `.md` file and take screenshot
+- **Location**: `bob_sessions/phase1_foundation.md` + `phase1_foundation.png`
 
 ---
 
@@ -174,6 +185,10 @@
 - Validation engine runs Python code safely against test cases
 - Bob sessions exported after assignment generation
 
+### Phase Completion
+- **Export Bob session**: Save conversation as `.md` file and take screenshot
+- **Location**: `bob_sessions/phase2_assignments.md` + `phase2_assignments.png`
+
 ---
 
 ## Phase 3: Codebase Understanding & Spec-Based Review
@@ -184,6 +199,13 @@
   - POST [`/api/submissions`](backend/api/submissions.py) - Submit student code
   - GET [`/api/submissions/{student_id}`](backend/api/submissions.py) - Get student submissions
   - GET [`/api/submissions/{id}/feedback`](backend/api/submissions.py) - Get detailed feedback
+- **Codebase Analysis API** (NEW)
+  - POST [`/api/codebase/analyse`](backend/api/codebase.py) - Analyze GitHub repository
+    - Takes GitHub repo URL as input
+    - Clones repository to temporary directory
+    - Uses Bob Ask mode to generate project understanding
+    - Returns structured analysis (architecture, patterns, tech stack)
+    - Stores analysis in database for reference
 - **Review Integration** (Ask mode)
   - POST [`/api/review/understand`](backend/api/review.py) - Analyze codebase structure
   - POST [`/api/review/spec-check`](backend/api/review.py) - Compare code against assignment spec
@@ -194,6 +216,10 @@
 - Code submission interface
   - Monaco Editor for code input (Python syntax highlighting)
   - File upload option for larger submissions
+- **Codebase Analysis Interface** (NEW)
+  - GitHub URL input form
+  - Analysis progress indicator
+  - Display structured project understanding
 - Submission history view per student
   - Timeline of attempts
   - Status indicators (pending, passed, failed)
@@ -207,24 +233,35 @@
 - Integration tests for submission workflow
 - Mock Bob Ask mode responses
 - Frontend component tests for code editor
+- Unit tests for GitHub cloning and analysis
 
 ### Deliverables
 - Students can submit code for assignments
+- Teachers can analyze GitHub repositories for project understanding
 - Bob Ask mode analyzes code structure and spec compliance
 - Combined feedback (tests + AI review) displayed to students
 - Monaco Editor integrated with syntax highlighting
 - Bob sessions exported after reviews
 
+### Phase Completion
+- **Export Bob session**: Save conversation as `.md` file and take screenshot
+- **Location**: `bob_sessions/phase3_review.md` + `phase3_review.png`
+
 ---
 
 ## Phase 4: Mistake Pattern Memory & Class Dashboard
-**Goal:** Track learning patterns and provide teacher insights
+**Goal:** Track learning patterns and provide teacher insights using watsonx.ai
 
 ### Backend
+- **watsonx.ai Integration**
+  - Create `watsonx_client.py` for API communication
+  - Configure granite-3-8b-instruct model
+  - Implement error aggregation pipeline
+  - POST [`/api/patterns/analyze`](backend/api/patterns.py) - Analyze aggregated errors with watsonx.ai
 - **Mistake Pattern Tracker**
-  - Create `pattern_analyzer.py` with AST parsing
-  - Analyze failed submissions for common error patterns
-  - Extract and categorize error types
+  - Aggregate failed submissions and error messages
+  - Send to watsonx.ai for pattern analysis
+  - Parse AI-generated insights into structured format
   - Update [`mistakes`](backend/models/mistakes.py) table with pattern frequency
   - GET [`/api/students/{id}/patterns`](backend/api/students.py) - Get mistake patterns per student
 - **Dashboard API**
@@ -235,25 +272,31 @@
 ### Frontend
 - **Student View**
   - Personal mistake pattern display (charts/graphs)
+  - AI-generated recommendations for improvement
   - Progress tracking across assignments
-  - Improvement suggestions based on patterns
 - **Teacher Dashboard**
   - Class-wide statistics (completion rates, common mistakes)
+  - watsonx.ai insights on class-level patterns
   - Per-assignment breakdown with charts
   - Individual student progress view
   - Filterable by date range, assignment, student
 
 ### Testing
-- Unit tests for pattern analyzer
+- Unit tests for watsonx.ai client
+- Mock watsonx.ai responses for testing
 - Integration tests for dashboard APIs
 - Frontend tests for chart components
 
 ### Deliverables
-- Mistake patterns automatically tracked and displayed
-- Teacher dashboard shows class-wide insights with visualizations
-- Students see their learning patterns and progress
+- watsonx.ai integration functional with granite-3-8b-instruct
+- Mistake patterns automatically analyzed and displayed
+- Teacher dashboard shows AI-powered class-wide insights with visualizations
+- Students see their learning patterns and AI recommendations
 - Complete MVP ready for testing
-- Final Bob session export for Phase 4
+
+### Phase Completion
+- **Export Bob session**: Save conversation as `.md` file and take screenshot
+- **Location**: `bob_sessions/phase4_dashboard.md` + `phase4_dashboard.png`
 
 ---
 
@@ -267,22 +310,24 @@ graph TD
     E -->|Test Results| F[Submission DB]
     E -->|Request Review| G[FastAPI + Bob Ask Mode]
     G -->|Analysis| F
-    F -->|Track Patterns| H[Pattern Analyzer]
-    H -->|Store| I[Mistake DB]
-    I -->|Aggregate| J[Dashboard API]
+    F -->|Aggregate Errors| H[watsonx.ai granite-3-8b-instruct]
+    H -->|Pattern Analysis| I[Mistake DB]
+    I -->|Display| J[Dashboard API]
     C -->|Fetch| K[Student View]
-    J -->|Display| A
-    B -->|Export Session| L[bob_sessions/]
-    G -->|Export Session| L
+    J -->|View| A
+    L[Teacher] -->|Analyze Repo| M[Codebase Analysis API]
+    M -->|Clone & Analyze| G
+    G -->|Project Understanding| N[Analysis DB]
 ```
 
 ## Success Criteria
 - Teachers can generate and manage assignments with Bob integration
+- Teachers can analyze GitHub repositories for project understanding
 - Students can submit code and receive automated feedback
 - AI reviews provide meaningful insights beyond test results
-- Mistake patterns help identify learning gaps
-- Dashboard provides actionable class insights
-- All Bob sessions exported and stored
+- watsonx.ai analyzes mistake patterns and provides actionable insights
+- Dashboard provides AI-powered class insights with visualizations
+- All Bob sessions exported and stored after each phase
 - System handles 100+ students without performance issues
 - Code execution is secure and sandboxed
 - Authentication prevents unauthorized access
