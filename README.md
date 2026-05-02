@@ -27,5 +27,9 @@ EduBob uses IBM Bob to generate assignments, review code, and explain codebases.
 
 ## Status
 
-Phase 1: Planning
+## Phase 1 Completed
+- FastAPI backend setup
+- SQLite database
+- Student CRUD APIs
+- Basic testing complete
 
