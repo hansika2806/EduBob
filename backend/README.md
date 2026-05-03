@@ -91,6 +91,8 @@ FastAPI backend with SQLite database for EduBob educational platform.
   }
   ```
 
+  **Note**: Code review results are generated from IBM Bob IDE Ask mode analysis output, ensuring accurate and context-aware feedback.
+
 ### Codebase Analysis (Phase 3) ⭐ NEW
 - **POST** `/api/codebase/analyze` - Analyze repository structure
   ```json

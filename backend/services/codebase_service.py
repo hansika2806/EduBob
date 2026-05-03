@@ -54,10 +54,13 @@ def analyze_repo(repo_url: str, bob_output: str) -> Dict[str, Any]:
         if in_architecture:
             if line.startswith('#') and len(architecture_lines) > 0:
                 break
-            if line.strip() and not line.startswith('-') and not line.startswith('*'):
-                architecture_lines.append(line.strip())
+            if line.strip() and not line.startswith('-') and not line.startswith('*') and not line.startswith('•'):
+                # Clean the line to ensure no mixed formatting
+                clean_line = line.strip()
+                architecture_lines.append(clean_line)
     
-    result["architecture_summary"] = ' '.join(architecture_lines) if architecture_lines else "Repository structure analyzed."
+    # Join with space and ensure clean output
+    result["architecture_summary"] = ' '.join(architecture_lines).strip() if architecture_lines else "Repository structure analyzed."
     
     # Extract key files from Bob output
     in_files_section = False
@@ -98,7 +101,8 @@ def analyze_repo(repo_url: str, bob_output: str) -> Dict[str, Any]:
         if in_tech_section:
             if line.startswith('-') or line.startswith('*') or line.startswith('•'):
                 tech = line.lstrip('-*• ').strip()
-                if tech:
+                # Ensure clean tech stack entries with no mixed formatting
+                if tech and not tech.startswith('#'):
                     result["tech_stack"].append(tech)
             elif line.startswith('#'):
                 in_tech_section = False
@@ -117,10 +121,13 @@ def analyze_repo(repo_url: str, bob_output: str) -> Dict[str, Any]:
         if in_explanation:
             if line.startswith('#') and len(explanation_lines) > 0:
                 break
-            if line.strip():
-                explanation_lines.append(line.strip())
+            if line.strip() and not line.startswith('-') and not line.startswith('*') and not line.startswith('•'):
+                # Clean the line to ensure no mixed formatting
+                clean_line = line.strip()
+                explanation_lines.append(clean_line)
     
-    result["explanation"] = ' '.join(explanation_lines) if explanation_lines else "Codebase analysis completed based on Bob IDE session."
+    # Join with space and ensure clean output
+    result["explanation"] = ' '.join(explanation_lines).strip() if explanation_lines else "Codebase analysis completed based on Bob IDE session."
     
     # Fallback: if no structured data found
     if not result["key_files"]:

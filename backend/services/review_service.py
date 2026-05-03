@@ -99,7 +99,7 @@ def analyze_submission(
     # Fallback: if no structured data found, provide basic feedback
     if not result["mistakes"] and not result["improvement_suggestions"]:
         result["summary_feedback"] = "Review completed. Please check Bob IDE output for detailed analysis."
-        result["mistakes"] = ["No specific mistakes identified in Bob output"]
+        result["mistakes"] = ["Limited analysis available. Refer to full Bob IDE session for detailed insights."]
         result["improvement_suggestions"] = ["Refer to Bob IDE session for detailed suggestions"]
     
     return result
