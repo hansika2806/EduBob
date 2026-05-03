@@ -50,6 +50,7 @@ class Submission(Base):
     failed_tests = Column(Integer, default=0)
     total_tests = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
+    review_feedback = Column(Text, nullable=True)  # JSON string with review feedback from Phase 3
     
     # Relationships
     student = relationship("Student", back_populates="submissions")

@@ -9,10 +9,14 @@ from models import Student, Assignment, Submission
 from schemas import (
     StudentCreate, StudentResponse,
     AssignmentCreate, AssignmentResponse, AssignmentGenerateRequest,
-    SubmissionCreate, SubmissionResponse, ValidationResult
+    SubmissionCreate, SubmissionResponse, ValidationResult,
+    ReviewRequest, ReviewResponse,
+    CodebaseAnalyzeRequest, CodebaseAnalyzeResponse
 )
 from services.bob_client import generate_assignment, parse_test_cases
 from services.validator import validate_submission, check_code_safety
+from services.review_service import analyze_submission
+from services.codebase_service import analyze_repo
 
 # Initialize FastAPI app
 app = FastAPI(title="EduBob API", version="1.0.0")
@@ -90,7 +94,7 @@ def generate_assignment_from_bob(
         db_assignment = Assignment(
             title=assignment_data["title"],
             description=assignment_data["description"],
-            test_cases=assignment_data["test_cases"],
+            test_cases=json.dumps(assignment_data["test_cases"]),
             starter_code=assignment_data.get("starter_code"),
             hints=json.dumps(assignment_data.get("hints", [])),
             topic=assignment_data["topic"],
@@ -224,6 +228,59 @@ def get_submission(submission_id: int, db: Session = Depends(get_db)):
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
     return submission
+
+
+# ==================== Phase 3: Code Review & Codebase Analysis ====================
+
+@app.post("/api/review/spec-check", response_model=ReviewResponse)
+def review_submission(request: ReviewRequest):
+    """
+    Review student code against assignment specification.
+    
+    This endpoint accepts Bob IDE output (pasted manually from Ask mode session)
+    and provides structured feedback on the student's submission.
+    
+    Note: Bob IDE output is passed here from manual Ask mode session.
+    This does NOT call Bob via subprocess or CLI.
+    """
+    try:
+        # Analyze submission using Bob IDE output
+        review_result = analyze_submission(
+            student_code=request.student_code,
+            assignment_spec=request.assignment_spec,
+            bob_output=request.bob_output
+        )
+        
+        return ReviewResponse(**review_result)
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Review failed: {str(e)}")
+
+
+@app.post("/api/codebase/analyze", response_model=CodebaseAnalyzeResponse)
+def analyze_codebase(request: CodebaseAnalyzeRequest):
+    """
+    Analyze repository structure and architecture.
+    
+    This endpoint accepts Bob IDE output (pasted manually from Ask mode session)
+    containing full codebase analysis.
+    
+    Note:
+    - repo_url is stored for reference only (repository is NOT cloned)
+    - Bob IDE output contains the full analysis from manual session
+    - This does NOT install gitpython or clone repositories
+    """
+    try:
+        # Analyze codebase using Bob IDE output
+        analysis_result = analyze_repo(
+            repo_url=request.repo_url,
+            bob_output=request.bob_output
+        )
+        
+        return CodebaseAnalyzeResponse(**analysis_result)
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Analysis failed: {str(e)}")
 
 
 if __name__ == "__main__":

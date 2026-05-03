@@ -46,7 +46,7 @@ def generate_assignment(bob_output: str, topic: str, difficulty: str) -> Dict[st
         assignment_data = {
             "title": parsed_output.get("title", f"{topic.title()} - {difficulty.title()}"),
             "description": parsed_output.get("description", ""),
-            "test_cases": json.dumps(parsed_output.get("test_cases", [])),
+            "test_cases": parsed_output.get("test_cases", []),
             "starter_code": parsed_output.get("starter_code", ""),
             "hints": parsed_output.get("hints", []),
             "topic": topic,
