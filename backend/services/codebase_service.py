@@ -6,6 +6,8 @@ Uses Bob IDE output (manually provided) for intelligent analysis.
 """
 
 from typing import Dict, Any, List
+import json
+import re
 
 
 def analyze_repo(repo_url: str, bob_output: str) -> Dict[str, Any]:
@@ -37,112 +39,160 @@ def analyze_repo(repo_url: str, bob_output: str) -> Dict[str, Any]:
         "explanation": ""
     }
     
-    # Extract architecture summary from Bob output
+    # PRIORITY 1: Try JSON parsing
+    try:
+        json_data = json.loads(bob_output)
+        if isinstance(json_data, dict):
+            if "architecture_summary" in json_data:
+                result["architecture_summary"] = json_data["architecture_summary"]
+            if "key_files" in json_data and isinstance(json_data["key_files"], list):
+                result["key_files"] = json_data["key_files"]
+            if "tech_stack" in json_data and isinstance(json_data["tech_stack"], list):
+                result["tech_stack"] = json_data["tech_stack"]
+            if "explanation" in json_data:
+                result["explanation"] = json_data["explanation"]
+            
+            # If we got valid data from JSON, return it
+            if result["architecture_summary"] or result["key_files"] or result["tech_stack"] or result["explanation"]:
+                return result
+    except (json.JSONDecodeError, ValueError):
+        pass
+    
+    # PRIORITY 2: Flexible text parsing
     lines = bob_output.split('\n')
     
-    # Look for architecture/structure section
+    # Extract architecture summary
     architecture_lines = []
     in_architecture = False
+    architecture_keywords = ["architecture", "project structure", "overview", "structure"]
     
-    for line in lines:
+    for i, line in enumerate(lines):
         line_lower = line.lower()
         
-        if "architecture" in line_lower or "structure" in line_lower or "overview" in line_lower:
-            in_architecture = True
-            continue
+        # Check if this line is an architecture header
+        if any(keyword in line_lower for keyword in architecture_keywords):
+            if ":" in line:
+                # Extract content after colon on same line
+                content = line.split(":", 1)[1].strip()
+                if content:
+                    architecture_lines.append(content)
+                in_architecture = True
+                continue
+            else:
+                in_architecture = True
+                continue
         
         if in_architecture:
-            if line.startswith('#') and len(architecture_lines) > 0:
+            # Stop at next section header
+            if line.strip() and (line.endswith(":") or line.startswith("#")):
                 break
-            if line.strip() and not line.startswith('-') and not line.startswith('*') and not line.startswith('•'):
-                # Clean the line to ensure no mixed formatting
-                clean_line = line.strip()
-                architecture_lines.append(clean_line)
+            if line.strip() and not line.startswith("-") and not line.startswith("*") and not line.startswith("•"):
+                architecture_lines.append(line.strip())
     
-    # Join with space and ensure clean output
-    result["architecture_summary"] = ' '.join(architecture_lines).strip() if architecture_lines else "Repository structure analyzed."
+    if architecture_lines:
+        result["architecture_summary"] = " ".join(architecture_lines)
     
-    # Extract key files from Bob output
-    in_files_section = False
-    for line in lines:
+    # Extract key files
+    files_keywords = ["key file", "important file", "main file", "files", "components"]
+    in_files = False
+    
+    for i, line in enumerate(lines):
         line_lower = line.lower()
         
-        if "key file" in line_lower or "important file" in line_lower or "main file" in line_lower:
-            in_files_section = True
+        # Check if this line is a files header
+        if any(keyword in line_lower for keyword in files_keywords):
+            in_files = True
             continue
         
-        if in_files_section:
-            if line.startswith('-') or line.startswith('*') or line.startswith('•'):
-                # Parse file entry: "- filename: purpose"
-                file_entry = line.lstrip('-*• ').strip()
-                if ':' in file_entry:
-                    parts = file_entry.split(':', 1)
-                    result["key_files"].append({
-                        "file": parts[0].strip(),
-                        "purpose": parts[1].strip()
-                    })
-                elif file_entry:
-                    result["key_files"].append({
-                        "file": file_entry,
-                        "purpose": "Core component"
-                    })
-            elif line.startswith('#'):
-                in_files_section = False
+        if in_files:
+            # Stop at next section header
+            if line.strip() and (line.endswith(":") or line.startswith("#")):
+                in_files = False
+                continue
+            
+            # Extract list items
+            stripped = line.strip()
+            if stripped:
+                # Remove bullets, numbers, arrows
+                item = re.sub(r'^[-*•→\d+\.]\s*', '', stripped)
+                if item:
+                    # Try to parse "filename: purpose" format
+                    if ":" in item:
+                        parts = item.split(":", 1)
+                        result["key_files"].append({
+                            "file": parts[0].strip(),
+                            "purpose": parts[1].strip()
+                        })
+                    else:
+                        result["key_files"].append({
+                            "file": item,
+                            "purpose": "Core component"
+                        })
     
-    # Extract tech stack from Bob output
-    in_tech_section = False
-    for line in lines:
+    # Extract tech stack
+    tech_keywords = ["tech", "stack", "technolog", "framework", "libraries", "dependencies"]
+    in_tech = False
+    
+    for i, line in enumerate(lines):
         line_lower = line.lower()
         
-        if "tech" in line_lower or "stack" in line_lower or "technolog" in line_lower or "framework" in line_lower:
-            in_tech_section = True
+        # Check if this line is a tech stack header
+        if any(keyword in line_lower for keyword in tech_keywords):
+            in_tech = True
             continue
         
-        if in_tech_section:
-            if line.startswith('-') or line.startswith('*') or line.startswith('•'):
-                tech = line.lstrip('-*• ').strip()
-                # Ensure clean tech stack entries with no mixed formatting
-                if tech and not tech.startswith('#'):
-                    result["tech_stack"].append(tech)
-            elif line.startswith('#'):
-                in_tech_section = False
+        if in_tech:
+            # Stop at next section header
+            if line.strip() and (line.endswith(":") or line.startswith("#")):
+                in_tech = False
+                continue
+            
+            # Extract list items
+            stripped = line.strip()
+            if stripped:
+                # Remove bullets, numbers, arrows
+                item = re.sub(r'^[-*•→\d+\.]\s*', '', stripped)
+                if item:
+                    result["tech_stack"].append(item)
     
-    # Extract explanation/summary
+    # Extract explanation
     explanation_lines = []
     in_explanation = False
+    explanation_keywords = ["explanation", "description", "summary", "details"]
     
-    for line in lines:
+    for i, line in enumerate(lines):
         line_lower = line.lower()
         
-        if "explanation" in line_lower or "summary" in line_lower or "description" in line_lower:
-            in_explanation = True
-            continue
+        # Check if this line is an explanation header
+        if any(keyword in line_lower for keyword in explanation_keywords):
+            if ":" in line:
+                # Extract content after colon on same line
+                content = line.split(":", 1)[1].strip()
+                if content:
+                    explanation_lines.append(content)
+                in_explanation = True
+                continue
+            else:
+                in_explanation = True
+                continue
         
         if in_explanation:
-            if line.startswith('#') and len(explanation_lines) > 0:
+            # Stop at next section header
+            if line.strip() and (line.endswith(":") or line.startswith("#")):
                 break
-            if line.strip() and not line.startswith('-') and not line.startswith('*') and not line.startswith('•'):
-                # Clean the line to ensure no mixed formatting
-                clean_line = line.strip()
-                explanation_lines.append(clean_line)
+            if line.strip() and not line.startswith("-") and not line.startswith("*") and not line.startswith("•"):
+                explanation_lines.append(line.strip())
     
-    # Join with space and ensure clean output
-    result["explanation"] = ' '.join(explanation_lines).strip() if explanation_lines else "Codebase analysis completed based on Bob IDE session."
+    if explanation_lines:
+        result["explanation"] = " ".join(explanation_lines)
     
-    # Fallback: if no structured data found
-    if not result["key_files"]:
-        result["key_files"] = [
-            {
-                "file": "See Bob IDE output",
-                "purpose": "Detailed file analysis available in Bob session"
-            }
-        ]
-    
-    if not result["tech_stack"]:
-        result["tech_stack"] = ["See Bob IDE output for tech stack details"]
-    
-    if not result["architecture_summary"]:
-        result["architecture_summary"] = "Repository analysis completed. Check Bob IDE output for details."
+    # PRIORITY 3: Fallback - extract meaningful content
+    if not result["architecture_summary"] and not result["key_files"] and not result["tech_stack"] and not result["explanation"]:
+        # Use first 300 characters as architecture summary
+        result["architecture_summary"] = bob_output[:300].strip()
+        result["key_files"] = []
+        result["tech_stack"] = []
+        result["explanation"] = ""
     
     return result
 

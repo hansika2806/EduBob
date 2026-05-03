@@ -6,6 +6,8 @@ Uses Bob IDE output (manually provided) for intelligent feedback.
 """
 
 from typing import Dict, Any, List
+import json
+import re
 
 
 def analyze_submission(
@@ -33,74 +35,131 @@ def analyze_submission(
         Bob IDE output is passed here from manual Ask mode session.
         This function does NOT call Bob via subprocess or CLI.
     """
-    # Parse Bob IDE output to extract review feedback
-    # Bob IDE output contains the analysis from a manual session
-    
     result = {
         "summary_feedback": "",
         "mistakes": [],
         "improvement_suggestions": []
     }
     
-    # Extract summary feedback from Bob output
-    if "summary" in bob_output.lower() or "feedback" in bob_output.lower():
-        lines = bob_output.split('\n')
-        summary_lines = []
-        in_summary = False
+    # PRIORITY 1: Try JSON parsing
+    try:
+        json_data = json.loads(bob_output)
+        if isinstance(json_data, dict):
+            if "summary_feedback" in json_data:
+                result["summary_feedback"] = json_data["summary_feedback"]
+            if "mistakes" in json_data and isinstance(json_data["mistakes"], list):
+                result["mistakes"] = json_data["mistakes"]
+            if "improvement_suggestions" in json_data and isinstance(json_data["improvement_suggestions"], list):
+                result["improvement_suggestions"] = json_data["improvement_suggestions"]
+            
+            # If we got valid data from JSON, return it
+            if result["summary_feedback"] or result["mistakes"] or result["improvement_suggestions"]:
+                return result
+    except (json.JSONDecodeError, ValueError):
+        pass
+    
+    # PRIORITY 2: Flexible text parsing
+    lines = bob_output.split('\n')
+    
+    # Extract summary feedback
+    summary_lines = []
+    in_summary = False
+    summary_keywords = ["summary", "feedback", "overall", "review"]
+    
+    for i, line in enumerate(lines):
+        line_lower = line.lower()
         
-        for line in lines:
-            line_lower = line.lower()
-            if "summary" in line_lower or "overall" in line_lower:
+        # Check if this line is a summary header
+        if any(keyword in line_lower for keyword in summary_keywords):
+            if ":" in line:
+                # Extract content after colon on same line
+                content = line.split(":", 1)[1].strip()
+                if content:
+                    summary_lines.append(content)
                 in_summary = True
                 continue
-            if in_summary and line.strip():
-                if line.startswith('#') or line.startswith('##'):
-                    break
+            else:
+                in_summary = True
+                continue
+        
+        if in_summary:
+            # Stop at next section header
+            if line.strip() and (line.endswith(":") or line.startswith("#")):
+                break
+            if line.strip():
                 summary_lines.append(line.strip())
-        
-        result["summary_feedback"] = ' '.join(summary_lines) if summary_lines else "Code review completed."
-    else:
-        result["summary_feedback"] = "Code review completed based on Bob IDE analysis."
     
-    # Extract mistakes from Bob output
-    mistakes_section = False
-    for line in bob_output.split('\n'):
+    if summary_lines:
+        result["summary_feedback"] = " ".join(summary_lines)
+    
+    # Extract mistakes
+    mistakes_keywords = ["mistake", "issue", "problem", "error"]
+    in_mistakes = False
+    
+    for i, line in enumerate(lines):
         line_lower = line.lower()
         
-        if "mistake" in line_lower or "error" in line_lower or "issue" in line_lower:
-            mistakes_section = True
+        # Check if this line is a mistakes header
+        if any(keyword in line_lower for keyword in mistakes_keywords):
+            in_mistakes = True
+            # Check if content is on same line after colon
+            if ":" in line:
+                content = line.split(":", 1)[1].strip()
+                if content and not content.startswith("-") and not content.startswith("*"):
+                    result["mistakes"].append(content)
             continue
         
-        if mistakes_section:
-            if line.startswith('-') or line.startswith('*') or line.startswith('•'):
-                mistake = line.lstrip('-*• ').strip()
-                if mistake:
-                    result["mistakes"].append(mistake)
-            elif line.startswith('#') or (line.strip() and not line.startswith(' ')):
-                mistakes_section = False
+        if in_mistakes:
+            # Stop at next section header
+            if line.strip() and (line.endswith(":") or line.startswith("#")):
+                in_mistakes = False
+                continue
+            
+            # Extract list items
+            stripped = line.strip()
+            if stripped:
+                # Remove bullets, numbers, arrows
+                item = re.sub(r'^[-*•→\d+\.]\s*', '', stripped)
+                if item:
+                    result["mistakes"].append(item)
     
-    # Extract improvement suggestions from Bob output
-    suggestions_section = False
-    for line in bob_output.split('\n'):
+    # Extract improvement suggestions
+    suggestions_keywords = ["suggestion", "recommendation", "improve", "consider", "should"]
+    in_suggestions = False
+    
+    for i, line in enumerate(lines):
         line_lower = line.lower()
         
-        if "suggestion" in line_lower or "improve" in line_lower or "recommend" in line_lower:
-            suggestions_section = True
+        # Check if this line is a suggestions header
+        if any(keyword in line_lower for keyword in suggestions_keywords):
+            in_suggestions = True
+            # Check if content is on same line after colon
+            if ":" in line:
+                content = line.split(":", 1)[1].strip()
+                if content and not content.startswith("-") and not content.startswith("*"):
+                    result["improvement_suggestions"].append(content)
             continue
         
-        if suggestions_section:
-            if line.startswith('-') or line.startswith('*') or line.startswith('•'):
-                suggestion = line.lstrip('-*• ').strip()
-                if suggestion:
-                    result["improvement_suggestions"].append(suggestion)
-            elif line.startswith('#') or (line.strip() and not line.startswith(' ')):
-                suggestions_section = False
+        if in_suggestions:
+            # Stop at next section header
+            if line.strip() and (line.endswith(":") or line.startswith("#")):
+                in_suggestions = False
+                continue
+            
+            # Extract list items
+            stripped = line.strip()
+            if stripped:
+                # Remove bullets, numbers, arrows
+                item = re.sub(r'^[-*•→\d+\.]\s*', '', stripped)
+                if item:
+                    result["improvement_suggestions"].append(item)
     
-    # Fallback: if no structured data found, provide basic feedback
-    if not result["mistakes"] and not result["improvement_suggestions"]:
-        result["summary_feedback"] = "Review completed. Please check Bob IDE output for detailed analysis."
-        result["mistakes"] = ["Limited analysis available. Refer to full Bob IDE session for detailed insights."]
-        result["improvement_suggestions"] = ["Refer to Bob IDE session for detailed suggestions"]
+    # PRIORITY 3: Fallback - extract meaningful content
+    if not result["summary_feedback"] and not result["mistakes"] and not result["improvement_suggestions"]:
+        # Use first 300 characters as summary
+        result["summary_feedback"] = bob_output[:300].strip()
+        result["mistakes"] = []
+        result["improvement_suggestions"] = []
     
     return result
 
