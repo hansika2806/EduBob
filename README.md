@@ -47,6 +47,7 @@ EduBob integrates IBM Bob's AI capabilities to:
 - **SQLite** - Lightweight database with SQLAlchemy ORM
 - **IBM Bob** - AI-powered code generation and analysis
 - **watsonx.ai** - Pattern analysis with granite-3-8b-instruct model
+- Without API keys, pattern analysis is skipped and dashboards show rule-based insights only
 - **RestrictedPython** - Safe code execution sandbox
 
 ### Frontend
