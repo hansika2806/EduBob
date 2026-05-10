@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 
 Base = declarative_base()
 
@@ -30,7 +30,7 @@ class Assignment(Base):
     hints = Column(Text, nullable=True)  # JSON string
     topic = Column(String(100), nullable=True)
     difficulty = Column(String(20), nullable=True)  # beginner, intermediate, advanced
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     submissions = relationship("Submission", back_populates="assignment")
@@ -44,7 +44,7 @@ class Submission(Base):
     assignment_id = Column(Integer, ForeignKey("assignments.id"), nullable=False)
     code = Column(Text, nullable=False)
     status = Column(String(20), default="pending")  # pending, passed, failed, partial
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     test_results = Column(Text, nullable=True)  # JSON string with test results
     passed_tests = Column(Integer, default=0)
     failed_tests = Column(Integer, default=0)
@@ -64,7 +64,7 @@ class Mistake(Base):
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     pattern = Column(Text, nullable=False)  # JSON string describing the mistake pattern
     count = Column(Integer, default=1)
-    last_seen = Column(DateTime, default=datetime.utcnow)
+    last_seen = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     student = relationship("Student", back_populates="mistakes")
