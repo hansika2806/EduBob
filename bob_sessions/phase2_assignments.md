@@ -51,7 +51,10 @@ Phase 2 successfully implemented the assignment system with Bob IDE integration,
 - topic: String (e.g., "loops", "functions")
 - difficulty: String (e.g., "beginner", "intermediate", "advanced")
 - created_at: DateTime
-```
+
+FIXED ISSUES : 
+- Fixed test_cases parsing from JSON string to array
+- Added validation for proper test execution
 
 **Submission Model Updates:**
 ```python

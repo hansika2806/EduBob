@@ -32,6 +32,8 @@ Files follow this pattern:
 - `phase3_review.md` - Code review and analysis conversation
 - `phase3_review.png` - Screenshot of review implementation
 
+**Note**: Code review results are generated from IBM Bob IDE Ask mode analysis output, ensuring accurate and context-aware feedback.
+
 ### Phase 4: Mistake Pattern Memory & Class Dashboard
 - `phase4_dashboard.md` - Dashboard and watsonx.ai integration conversation
 - `phase4_dashboard.png` - Screenshot of dashboard features
